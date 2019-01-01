@@ -90,6 +90,33 @@ namespace Buildalyzer.Workspaces.Tests
             compilation.GetSymbolsWithName(x => x == "Class2").ShouldNotBeEmpty(log.ToString());
         }
 
+        [Test]
+        public void SupportsExternalAssemblyAliases()
+        {
+            // Given
+            StringWriter log = new StringWriter();
+            ProjectAnalyzer analyzer = GetProjectAnalyzer(@"projects\LegacyFrameworkProjectWithExternalAlias\LegacyFrameworkProjectWithExternalAlias.csproj", log);
+
+            // When
+            Workspace workspace = analyzer.GetWorkspace();
+            Compilation compilation = workspace.CurrentSolution.Projects.First().GetCompilationAsync().Result;
+
+            // Then
+            // TODO: 消す
+            foreach (MetadataReference reference in compilation.References)
+            {
+                log.WriteLine("Reference: " + reference.Display);
+            }
+            compilation.References
+                .Where(x => x.Display.Contains("System.Data", StringComparison.Ordinal))
+                .SelectMany(x => x.Properties.Aliases)
+                .ShouldBe(new[] { "Data1", "Data2" }, true, log.ToString());
+            compilation.References
+                .Where(x => x.Display.Contains("LegacyFrameworkProject", StringComparison.Ordinal))
+                .SelectMany(x => x.Properties.Aliases)
+                .ShouldBe(new[] { "Ref1", "Ref2" }, true, log.ToString());
+        }
+
         private ProjectAnalyzer GetProjectAnalyzer(string projectFile, StringWriter log, AnalyzerManager manager = null)
         {
             // The path will get normalized inside the .GetProject() call below

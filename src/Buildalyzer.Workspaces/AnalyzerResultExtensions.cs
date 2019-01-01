@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -200,12 +201,36 @@ namespace Buildalyzer.Workspaces
             return null;
         }
 
-        private static IEnumerable<ProjectReference> GetExistingProjectReferences(AnalyzerResult analyzerResult, Workspace workspace) =>
-            analyzerResult.ProjectReferences
-                .Select(x => workspace.CurrentSolution.Projects.FirstOrDefault(y => y.FilePath == x))
-                .Where(x => x != null)
-                .Select(x => new ProjectReference(x.Id))
-            ?? Array.Empty<ProjectReference>();
+        private static IEnumerable<ProjectReference> GetExistingProjectReferences(AnalyzerResult analyzerResult, Workspace workspace)
+        {
+            if (!analyzerResult.Items.TryGetValue("ProjectReference", out ProjectItem[] items))
+            {
+                yield break;
+            }
+
+            foreach (ProjectItem item in items)
+            {
+                string fullPath = AnalyzerManager.NormalizePath(
+                    Path.Combine(Path.GetDirectoryName(analyzerResult.ProjectFilePath), item.ItemSpec));
+
+                Project project = workspace.CurrentSolution.Projects.FirstOrDefault(x => x.FilePath == fullPath);
+
+                if (project != null)
+                {
+                    ImmutableArray<string> aliases = ImmutableArray<string>.Empty;
+
+                    if (item.Metadata.TryGetValue("Aliases", out string aliasesMetadata) && !string.IsNullOrEmpty(aliasesMetadata))
+                    {
+                        aliases = aliasesMetadata.Split(',')
+                            .Select(x => x.Trim())
+                            .Where(x => x.Length > 0)
+                            .ToImmutableArray();
+                    }
+
+                    yield return new ProjectReference(project.Id, aliases);
+                }
+            }
+        }
 
         private static IEnumerable<ProjectAnalyzer> GetReferencedAnalyzerProjects(AnalyzerResult analyzerResult) =>
             analyzerResult.ProjectReferences
@@ -225,11 +250,45 @@ namespace Buildalyzer.Workspaces
                     filePath: x))
             ?? Array.Empty<DocumentInfo>();
 
-        private static IEnumerable<MetadataReference> GetMetadataReferences(AnalyzerResult analyzerResult) =>
-            analyzerResult
-                .References?.Where(File.Exists)
-                .Select(x => MetadataReference.CreateFromFile(x))
-            ?? (IEnumerable<MetadataReference>)Array.Empty<MetadataReference>();
+        private static IEnumerable<MetadataReference> GetMetadataReferences(AnalyzerResult analyzerResult)
+        {
+            string[] references = analyzerResult.References;
+
+            if (references == null)
+            {
+                yield break;
+            }
+
+            foreach (string reference in references)
+            {
+                string alias = null;
+                string path = null;
+
+                if (File.Exists(reference))
+                {
+                    path = reference;
+                }
+                else
+                {
+                    // Read alias
+                    int eqIndex = reference.IndexOf('=');
+                    if (eqIndex >= 0)
+                    {
+                        alias = reference.Substring(0, eqIndex);
+                        path = reference.Substring(eqIndex + 1);
+                    }
+
+                    if (string.IsNullOrEmpty(path) || !File.Exists(path))
+                    {
+                        continue;
+                    }
+                }
+
+                ImmutableArray<string> aliases = alias == null ? ImmutableArray<string>.Empty : ImmutableArray.Create(alias);
+
+                yield return MetadataReference.CreateFromFile(path, new MetadataReferenceProperties(aliases: aliases));
+            }
+        }
 
         private static string GetLanguageName(string projectPath)
         {

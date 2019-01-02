@@ -20,16 +20,16 @@ namespace Buildalyzer.Tests
         [TestCase("\"f oo.cs\"", new[] { "f oo.cs" })]
         [TestCase("\" foo.cs\"", new[] { " foo.cs" })]
         [TestCase("\"foo.cs \"", new[] { "foo.cs " })]
-        [TestCase("\"foo.cs\\\"\"", new[] { "foo.cs\\\"" })]
+        [TestCase("\"foo.cs\\\"\"", new[] { "foo.cs\"" })]
         [TestCase("\"f oo.cs\" bar.cs", new[] { "f oo.cs", "bar.cs" })]
         [TestCase("\" foo.cs\" bar.cs", new[] { " foo.cs", "bar.cs" })]
         [TestCase("\"foo.cs \" bar.cs", new[] { "foo.cs ", "bar.cs" })]
-        [TestCase("\"foo.cs\\\"\" bar.cs", new[] { "foo.cs\\\"", "bar.cs" })]
-        [TestCase("\"fo\\\"o.cs\" bar.cs", new[] { "fo\\\"o.cs", "bar.cs" })]
+        [TestCase("\"foo.cs\\\"\" bar.cs", new[] { "foo.cs\"", "bar.cs" })]
+        [TestCase("\"fo\\\"o.cs\" bar.cs", new[] { "fo\"o.cs", "bar.cs" })]
         [TestCase("bar.cs \"f oo.cs\"", new[] { "bar.cs", "f oo.cs" })]
         [TestCase("bar.cs \" foo.cs\"", new[] { "bar.cs", " foo.cs" })]
-        [TestCase("bar.cs \"foo.cs\\\"\"", new[] { "bar.cs", "foo.cs\\\"" })]
-        [TestCase("\"foo.cs\\\" bar.cs\"", new[] { "foo.cs\\\" bar.cs" })]
+        [TestCase("bar.cs \"foo.cs\\\"\"", new[] { "bar.cs", "foo.cs\"" })]
+        [TestCase("\"foo.cs\\\" bar.cs\"", new[] { "foo.cs\" bar.cs" })]
         public void ParsesCscCommandLineSourceFiles(string commandLine, string[] sourceFiles)
         {
             // Given

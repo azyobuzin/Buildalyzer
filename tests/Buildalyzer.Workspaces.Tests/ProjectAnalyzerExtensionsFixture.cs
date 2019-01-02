@@ -91,22 +91,47 @@ namespace Buildalyzer.Workspaces.Tests
         }
 
         [Test]
-        public void SupportsExternalAssemblyAliases()
+        public void SupportsExternalAssemblyAliasesLoadTargetProjectFirst()
         {
             // Given
             StringWriter log = new StringWriter();
             ProjectAnalyzer analyzer = GetProjectAnalyzer(@"projects\LegacyFrameworkProjectWithExternalAlias\LegacyFrameworkProjectWithExternalAlias.csproj", log);
+            GetProjectAnalyzer(@"projects\LegacyFrameworkProject\LegacyFrameworkProject.csproj", log, analyzer.Manager);
 
             // When
-            Workspace workspace = analyzer.GetWorkspace();
-            Compilation compilation = workspace.CurrentSolution.Projects.First().GetCompilationAsync().Result;
+            Workspace workspace = analyzer.GetWorkspace(true);
+            Compilation compilation = workspace.CurrentSolution.Projects
+                .Single(x => x.Id.Id == analyzer.ProjectGuid)
+                .GetCompilationAsync().Result;
 
             // Then
-            // TODO: 消す
-            foreach (MetadataReference reference in compilation.References)
-            {
-                log.WriteLine("Reference: " + reference.Display);
-            }
+            compilation.References
+                .Where(x => x.Display.Contains("System.Data", StringComparison.Ordinal))
+                .SelectMany(x => x.Properties.Aliases)
+                .ShouldBe(new[] { "Data1", "Data2" }, true, log.ToString());
+            compilation.References
+                .Where(x => x.Display.Contains("LegacyFrameworkProject", StringComparison.Ordinal))
+                .SelectMany(x => x.Properties.Aliases)
+                .ShouldBe(new[] { "Ref1", "Ref2" }, true, log.ToString());
+        }
+
+        [Test]
+        public void SupportsExternalAssemblyAliasesLoadTargetProjectLast()
+        {
+            // Given
+            StringWriter log = new StringWriter();
+            ProjectAnalyzer referenceProjectAnalyzer = GetProjectAnalyzer(@"projects\LegacyFrameworkProject\LegacyFrameworkProject.csproj", log);
+            ProjectAnalyzer targetProjectAnalyzer = GetProjectAnalyzer(@"projects\LegacyFrameworkProjectWithExternalAlias\LegacyFrameworkProjectWithExternalAlias.csproj", log, referenceProjectAnalyzer.Manager);
+
+            // When
+            Workspace workspace = new AdhocWorkspace();
+            referenceProjectAnalyzer.AddToWorkspace(workspace);
+            targetProjectAnalyzer.AddToWorkspace(workspace);
+            Compilation compilation = workspace.CurrentSolution.Projects
+                .Single(x => x.Id.Id == targetProjectAnalyzer.ProjectGuid)
+                .GetCompilationAsync().Result;
+
+            // Then
             compilation.References
                 .Where(x => x.Display.Contains("System.Data", StringComparison.Ordinal))
                 .SelectMany(x => x.Properties.Aliases)

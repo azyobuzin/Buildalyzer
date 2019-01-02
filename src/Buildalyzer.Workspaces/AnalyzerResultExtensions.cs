@@ -73,6 +73,7 @@ namespace Buildalyzer.Workspaces
                     && existingReferences.Contains(analyzerResult.ProjectFilePath))
                 {
                     // Add the reference to the existing project
+                    // TODO: extern assembly alias
                     ProjectReference projectReference = new ProjectReference(projectId);
                     solution = solution.AddProjectReference(existingProject.Id, projectReference);
                 }
